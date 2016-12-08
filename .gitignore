@@ -2,3 +2,8 @@
 *.train
 *.zip
 ml*/
+*.docx
+*.pptx
+*.png
+*.jpeg
+*.tmp

@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import os
 from sets import Set
 
 file1m = {
 	'train_name': 'ml-1m/ratings.dat',
 	'separator': '::',
+	'test_name': 'ml-1m/ratings.dat',
 	'skip': False
 }
 
@@ -29,26 +31,7 @@ filer1 = {
 	'skip': False
 }
 
-filer2 = {
-	'train_name': 'ml-1m/r2.train',
-	'test_name': 'ml-1m/r2.test',
-	'separator': '::',
-	'skip': False
-}
 
-filer3 = {
-	'train_name': 'ml-1m/r3.train',
-	'test_name': 'ml-1m/r3.test',
-	'separator': '::',
-	'skip': False
-}
-
-filer4 = {
-	'train_name': 'ml-1m/r4.train',
-	'test_name': 'ml-1m/r4.test',
-	'separator': '::',
-	'skip': False
-}
 
 filer5 = {
 	'train_name': 'ml-1m/r5.train',
@@ -88,11 +71,18 @@ filerbig = {
 filerhuge = {
 	'train_name': 'ml-20m/r1.train',
 	'test_name': 'ml-20m/r1.test',
-	'separator': '::',
+	'separator': ',',
 	'skip': False
 }
 
-cur_file = filerbig;
+filermain = {
+	'train_name': 'ratings.dat',
+	'test_name': 'test.dat',
+	'separator': ',',
+	'skip': True
+}
+
+cur_file = filermain;
 
 dic_train = {}
 sim_data = {}
@@ -107,6 +97,7 @@ min_similar_user_id = 0
 min_sim = 2
 max_similar_user_id = 0
 max_sim = -1
+sim_function = 0
 
 predict_user_id = int(input('user_id: '))
 num_recommending_movie = int(input('No. of movies to recommend: '))
@@ -114,13 +105,15 @@ num_recommending_movie = int(input('No. of movies to recommend: '))
 # ======== Functions =============
 
 def sim(u, v):
-	# s = sim_cosine(u, v)
-	s = pearson(u, v)
 	global min_similar_user_id
 	global min_sim
 	global max_similar_user_id
 	global max_sim
-	# print "s = %f min %f user %d max %f user %d" % (s, min_sim, min_similar_user_id, max_sim, max_similar_user_id)
+	global sim_function
+	if (sim_function == 0):
+		s = sim_cosine(u, v)
+	else:
+		s = pearson(u, v)
 	sim_data[u['user_id']] = s
 	sim_data[v['user_id']] = s
 	if (min_sim > s):
@@ -141,16 +134,11 @@ def sim_cosine(u, v):
 	ts1 = 0.0
 	ts2 = 0.0
 	for movie_id in movie_in_common:
-		# print "==="
-		# print "user %d movie %d rating %f" % (u['user_id'], movie_id, u['ratings'][movie_id])
-		# print "user %d movie %d rating %f" % (v['user_id'], movie_id, v['ratings'][movie_id])
-		# print "==="
 		ts += u['ratings'][movie_id] * v['ratings'][movie_id]
 		ts1 += (u['ratings'][movie_id]) ** 2
 		ts2 += (v['ratings'][movie_id]) ** 2
 	ms = (ts1 ** 0.5) * (ts2 ** 0.5)
 	if (ms == 0):
-		# print "user %d user %d common %d" % (u['user_id'], v['user_id'], len(movie_in_common))
 		return 0
 	return ts / ms
 
@@ -168,7 +156,6 @@ def pearson(u, v):
 		return 0
 	avg_u /= len(movie_in_common)
 	avg_v /= len(movie_in_common)
-	# print "avgu %f avgv %f" % (avg_u, avg_v)
 	variance_u = 0.0
 	variance_v = 0.0
 	covariance = 0.0
@@ -208,7 +195,6 @@ def compare(o1, o2):
 # 	list_train.sort(compare)
 
 def predict(user_id, movie_id):
-	# print "processing user %d" % user_id
 	global dic_train
 	global list_train
 	global predict_user
@@ -234,44 +220,25 @@ def predict(user_id, movie_id):
 				'ratings': dic_train[uid]
 			})
 
-	# print "neight length %d start sorting..." % len(list_train)
-	# print predict_user
-	# sort_neighbor(list_train)
-	# list_train.sort(compare)
 	for u in list_train:
 		if (u['user_id'] in sim_data):
 			u['weight'] = sim_data[u['user_id']]
 		else:
 			u['weight'] = sim(u, predict_user)
-	# print "done sorting"
-	# for i in range(len(list_train)):
-		# print "user %d user_id %d sim %f" % (list_train[i]['user_id'], user_id, list_train[i]['weight'])
 	list_train_len = len(list_train)
 	ts = 0.0
 	ms = 0.0
 	stt = 0
 	for i in range(list_train_len):
-		# print list_train[i]['user_id']
 		if ((movie_id in list_train[i]['ratings']) and (list_train[i]['weight'] >= 0.8)):
 			stt += 1
-			# print 'hehe'
-			# s = sim(list_train[i], predict_user)
-			# s = 0
 			s = list_train[i]['weight']
-			# if ('weight' in list_train[i]):
-				
-			# else:
-			# 	# print 'weight not in user %d' % list_train[i]['user_id']
-			# 	pass
-			# print "sim %f" % s
 			ts += s * list_train[i]['ratings'][movie_id]
 			if (s < 0):
 				s = -s
 			ms += s
-	# print "ts %f ms %f" % (ts, ms)
 	if (ms == 0):
 		return 0
-	# print "knn %d" % stt
 	return ts / ms
 
 # ================================
@@ -301,7 +268,7 @@ for line in f:
 f.close()
 
 if (predict_user_id in dic_train):
-	print 'done learning, checking %d movie in training data of %d' % (len(dic_train[predict_user_id]), predict_user_id)
+	print 'done learning, checking %d movie in training data of user %d' % (len(dic_train[predict_user_id]), predict_user_id)
 else:
 	print 'done learning'
 
@@ -313,6 +280,21 @@ if (predict_user_id not in dic_train):
 	print 'No data from this user'
 	sys.exit()
 
+while True:
+	if ('win' in sys.platform):
+		os.system('cls')
+	else:
+		os.system('clear')
+	print 'Choose Similarity Function:'
+	print '0: Cosine Similarity'
+	print '1: Pearson\'s Correlation Coefficient'
+	try:
+		sim_function = int(raw_input())
+	except Exception, e:
+		sim_function = -1
+		continue
+	if ((sim_function == 0) or (sim_function == 1)):
+		break
 
 for movie_id in dic_train[predict_user_id]:
 	# print movie_id
@@ -328,40 +310,52 @@ rmse /= n
 rmse = rmse ** 0.5
 print "training RMSE %f" % rmse
 
-f = open(cur_file['test_name'])
+rmse = 0.0
+n1 = 0
+n = 0
 
-for line in f:
-	text = line.strip().split(cur_file['separator'])
-	user_id = int(text[0])
-	if (user_id != predict_user_id):
-		continue
-	movie_id = int(text[1])
-	list_test.append(movie_id)
-	real_rating = float(text[2])
-	predict_rating = predict(user_id, movie_id)
-	if (predict_rating > 0):
-		n1 += 1
-		err = real_rating - predict_rating
-		err = err ** 2
-		# print "%d %d : %f %f %f" % (user_id, movie_id, real_rating, predict_rating, err)
-		rmse += err
+try:
+	f = open(cur_file['test_name'])
 
-f.close()
+	for line in f:
+		text = line.strip().split(cur_file['separator'])
+		user_id = int(text[0])
+		if (user_id != predict_user_id):
+			continue
+		movie_id = int(text[1])
+		list_test.append(movie_id)
+		real_rating = float(text[2])
+		predict_rating = predict(user_id, movie_id)
+		if (predict_rating > 0):
+			n1 += 1
+			err = real_rating - predict_rating
+			err = err ** 2
+			# print "%d %d : %f %f %f" % (user_id, movie_id, real_rating, predict_rating, err)
+			rmse += err
 
-rmse /= n
-rmse = rmse ** 0.5
-print "test RMSE %f" % rmse
+	f.close()
+
+	if (n != 0):
+		rmse /= n
+		rmse = rmse ** 0.5
+		print "test RMSE %f" % rmse
+
+except Exception, e:
+	pass
+
+
 
 print 'start recommending from %d movies' % max_movie_id
 
-lower_bound = 4
+lower_bound = 4.0
 num_high_recommending_movies = 0
 
 res = []
 
 for movie_id in range(1, max_movie_id):
 	if (movie_id % 100 == 0):
-		print 'checking %d' % movie_id
+		# print 'checking %d' % movie_id
+		pass
 	if (movie_id in dic_train[predict_user_id] or movie_id in list_test):
 		continue
 	predict_rating = predict(predict_user_id, movie_id)
@@ -376,7 +370,7 @@ for movie_id in range(1, max_movie_id):
 			'rating': predict_rating
 		})
 
-print 'done predicting. sorting...'
+# print 'done predicting. sorting...'
 
 def cmp(r1, r2):
 	r1_ = r1['rating']
@@ -395,6 +389,6 @@ for i in range(len(res)):
 	print "%d : %f" % (res[i]['movie_id'], res[i]['rating'])
 	num_recommending_movie -= 1
 
-print "min %d user %d , max %d user %d" % (min_sim, min_similar_user_id, max_sim, max_similar_user_id)
+# print "min %d user %d , max %d user %d" % (min_sim, min_similar_user_id, max_sim, max_similar_user_id)
 
 print 'end'
